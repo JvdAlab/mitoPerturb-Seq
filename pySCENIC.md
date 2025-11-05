@@ -1,0 +1,2 @@
+pySCENIC was implemented according to the online tutorial https://htmlpreview.github.io/?https://github.com/aertslab/SCENICprotocol/blob/master/notebooks/PBMC10k_SCENIC-protocol-CLI.html but Kate and I made a number of tweaks. \
+I'm not sure it's necessary to include details of these tweaks, as the final output of the pipeline should be the same (or at least comparable!) regardless of the exact implementation.
