@@ -41,3 +41,5 @@ htseq-count \
 Sample_trimmed_aligned/RUM.bam \
 Reference_genes.gtf > Sample_counts.txt
 ```
+
+Downstream analysis of read count data performed in edgeR as outlined in the user guide https://bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf
