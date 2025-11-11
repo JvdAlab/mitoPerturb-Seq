@@ -1,0 +1,1482 @@
+---
+title: "MitoPerturbSeq heteroplasmy analysis"
+author: "Abhilesh Dhawanjewar"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+format:
+    html:
+        code-fold: true
+        embed-resources: true
+        df-print: kable
+execute:
+    echo: false
+    warning: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+knitr::opts_chunk$set(
+    echo = FALSE,
+    message = FALSE,
+    warning = FALSE,
+    fig.align = "center"
+)
+
+# Manage conflicts
+library(conflicted)
+
+# Set preference for conflicts
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(plotly::layout)
+
+# Core packages
+library(here)
+library(stringr)
+library(tidyverse)
+library(broom)
+
+# Visualization
+library(patchwork)
+library(ggridges)
+library(ggrepel)
+library(scales)
+library(shades)
+library(plotly)
+library(paletteer)
+
+# Tables
+library(knitr)
+library(kableExtra)
+
+# Statistical analysis
+library(car)
+
+data_dir <- here("data")
+plot_dir <- here("figures", "mtDNA_heteroplasmy_analysis")
+
+if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+}
+
+# Set the seed for reproducibility
+set.seed(1234)
+```
+
+```{r}
+#| label: load-data
+#| echo: true
+#| code-summary: "Load and preprocess data"
+
+# Load data
+mtDNA_data <- read.csv(
+    here(data_dir, "integrated_dataset_metadata.csv"))
+# There are 76 rows with heteroplasmy values as NAs
+
+# Load mixscape data
+mixscape_data <- read.csv(
+    here(data_dir, "integrated_mixscape_metadata.csv"))
+
+# This function predicts technical measurement variance based on mtDNA depth and is used for empirical weighting in linear models
+het_sim_df <- readRDS(
+    here(data_dir, "het_depth_sim.rds")
+)
+get_measurement_variance <- readRDS(
+    here(data_dir, "measurement_variance_function.rds")
+)
+
+# Change labels for "Park2" and "Nontargeting"
+mtDNA_data$top_guide_final_enrich_combined <-   mtDNA_data$top_guide_final_enrich_combined %>%
+    replace(mtDNA_data$top_guide_final_enrich_combined == "Park2", "Prkn") %>%
+    replace(mtDNA_data$top_guide_final_enrich_combined == "Nontargeting", "NT")
+
+gRNA_order <- c(
+        "Akap1",
+        "Nnt",
+        "Polg",
+        "Tfam",
+        "Dnm1l",
+        "Mtfp1",
+        "Opa1",
+        "Snx9",
+        "Atg5",
+        "Oma1",
+        "Pink1",
+        "Ppargc1a",
+        "Prkn",
+        "Eomes",
+        "Neurod1",
+        "Olig1",
+        "Opn4",
+        "Rgr",
+        "Rrh",
+        "NT"
+    )
+
+# Order the factor levels
+mtDNA_data$top_guide_final_enrich_combined <- factor(
+    mtDNA_data$top_guide_final_enrich_combined,
+    levels = gRNA_order
+)
+
+mtDNA_data_by_gRNA <- mtDNA_data %>%
+    group_by(top_guide_final_enrich_combined) %>%
+    dplyr::summarise(
+        mean_het = mean(Heteroplasmy_all_5024, na.rm = TRUE),
+        var_het = var(Heteroplasmy_all_5024, na.rm = TRUE),
+        mean_depth = mean(mtDNA_depth, na.rm = TRUE),
+        n_cells = n()
+    ) %>%
+    arrange(desc(mean_het))
+
+# Add group labels to the gRNA genes
+mtDNA_data_by_gRNA <- mtDNA_data_by_gRNA %>%
+    dplyr::mutate(group = top_guide_final_enrich_combined)
+
+mtDNA_data_by_gRNA$group <- factor(
+    mtDNA_data_by_gRNA$group,
+    levels = gRNA_order
+)
+
+mtDNA_data_by_gRNA <- mtDNA_data_by_gRNA %>%
+    dplyr::mutate(func_group = case_when(
+        group %in% c("Akap1", "Nnt", "Polg", "Tfam") ~ "Maintanence Genes",
+        group %in% c("Dnm1l", "Mtfp1", "Opa1", "Snx9") ~ "Fission/Fusion",
+        group %in% c("Atg5", "Oma1", "Pink1", "Ppargc1a", "Prkn") ~ "Mitophagy",
+        group %in% c("Eomes", "Neurod1", "Olig1", "Opn4", "Rgr", "Rrh", "NT") ~ "Control"
+    ))
+
+# Add a grouping variable to the gRNA genes
+mtDNA_data <- mtDNA_data %>%
+    dplyr::mutate(group = case_when(
+        top_guide_final_enrich_combined %in% c("Akap1", "Nnt", "Polg", "Tfam") ~ "Maintanence Genes",
+        top_guide_final_enrich_combined %in% c("Dnm1l", "Mtfp1", "Opa1", "Snx9") ~ "Fission/Fusion",
+        top_guide_final_enrich_combined %in% c("Atg5", "Oma1", "Pink1", "Ppargc1a", "Prkn") ~ "Mitophagy",
+        top_guide_final_enrich_combined %in% c("Eomes", "Neurod1", "Olig1", "Opn4", "Rgr", "Rrh", "NT") ~ "Control"
+    ))
+
+mtDNA_data$group <- factor(
+    mtDNA_data$group,
+    levels = c("Maintenence Genes", "Fission/Fusion", "Mitophagy", "Control")
+)
+
+# Define colors for the gRNAs
+col_pal <- paletteer_d("ggsci::category20_d3")
+names(col_pal) <- gRNA_order
+
+# Highlight color
+custom_salmon <- saturation("#FA8072", 0.4)
+
+```
+
+### Distributions of mtDNA depth and heteroplasmy
+
+```{r}
+#| label: fig-ridge-plots
+#| fig-cap: "Ridge plots showing heteroplasmy distributions across gRNAs. TFAM, POLG, and OPA1 show broader distributions."
+#| fig-width: 10
+#| fig-height: 8
+#| fig-align: center
+#| fig-fullwidth: true
+
+plot_ridge <- function(data, y_var, x_var) {
+    ggplot(data, aes_string(x = y_var, y = x_var, fill = x_var)) +
+        geom_density_ridges() +
+        ylab("Guide RNAs") +
+        theme_minimal() +
+        theme(
+            legend.position = "none",
+            axis.text.x = element_text(angle = 90, hjust = 1),
+            axis.title.x = element_text(margin = margin(t = 10)),
+        ) +
+        scale_fill_manual(values = col_pal)
+}
+
+het_ridge_plot <- plot_ridge(
+    mtDNA_data,
+    "Heteroplasmy_all_5024",
+    "top_guide_final_enrich_combined") +
+    xlim(0, 1.0)
+
+depth_ridge_plot <- plot_ridge(
+    mtDNA_data,
+    "mtDNA_depth",
+    "top_guide_final_enrich_combined")
+
+(het_ridge_plot + depth_ridge_plot) +
+    plot_layout(axes = "collect")
+```
+
+### Applying mtDNA depth cutoff > 20
+
+In-silico modelling of heteroplasmy calling based on sub-sampling of a simulated heteroplasmic mtDNA population suggested an increase in sampling noise at mtDNA depths < 20. However, the most dramatic perturbations (TFAM, POLG, OPA1) also exhibit significant mtDNA copy number reduction.
+
+```{r}
+#| label: fig-depth-threshold-by-gRNA
+#| fig-cap: "Number of cells and proportion passing mtDNA depth > 20 threshold by gRNA. Top panel shows total cells (blue) and cells passing threshold (green). Bottom panel shows proportion passing threshold. TFAM, POLG, and OPA1 show the largest drops in cells passing threshold."
+#| fig-align: center
+#| fig-fullwidth: true
+
+# Summarize the total number of cells and the number of cells passing the mtDNA_depth > 20 threshold
+gRNA_cell_counts <- mtDNA_data %>%
+    group_by(top_guide_final_enrich_combined) %>%
+    dplyr::summarise(
+        total_cells = n(),
+        cells_passing_threshold = sum(mtDNA_depth > 20, na.rm = TRUE)
+    ) %>%
+    dplyr::mutate(
+        proportion_passing = cells_passing_threshold / total_cells
+    ) %>%
+    arrange(desc(total_cells))
+
+# Order gRNAs by decreasing proportion passing
+gRNA_cell_counts <- gRNA_cell_counts %>%
+    dplyr::mutate(
+        top_guide_final_enrich_combined = reorder(top_guide_final_enrich_combined, -proportion_passing)
+    )
+
+# Create a long-format data frame for plotting
+gRNA_cell_counts_long <- gRNA_cell_counts %>%
+    tidyr::pivot_longer(
+        cols = c(total_cells, cells_passing_threshold),
+        names_to = "cell_type",
+        values_to = "count"
+    ) %>%
+    # Explicitly set the factor levels for cell_type
+    dplyr::mutate(
+        cell_type = factor(cell_type, levels = c("total_cells", "cells_passing_threshold"))
+    )
+
+# Create the bar chart for total cells and cells passing threshold
+gRNA_barchart <- ggplot(gRNA_cell_counts_long, aes(
+    x = top_guide_final_enrich_combined,
+    y = count,
+    fill = cell_type
+)) +
+    geom_bar(stat = "identity", position = "identity", width = 0.8, alpha = 0.8) +
+    scale_fill_manual(
+        values = c(
+            "total_cells" = col_pal[["Akap1"]],
+            "cells_passing_threshold" = col_pal[["Prkn"]]
+        ),
+        labels = c("Total Cells", "Cells Passing Threshold")
+    ) +
+    theme_minimal() +
+    theme(
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.title = element_blank()
+    ) +
+    labs(
+        x = NULL,
+        y = "Number of Cells",
+        title = "Total Cells and Cells Passing mtDNA Depth > 20 Threshold"
+    )
+
+# Create the bar chart for proportion passing
+proportion_barchart <- ggplot(gRNA_cell_counts, aes(
+    x = top_guide_final_enrich_combined,
+    y = proportion_passing
+)) +
+    geom_bar(
+        stat = "identity",
+        fill = col_pal[["Polg"]],
+        width = 0.8,
+        alpha = 0.8
+    ) +
+    ylim(0, 1) +
+    theme_minimal() +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none"
+    ) +
+    labs(
+        x = "gRNA",
+        y = "Proportion Passing",
+        title = "Proportion of Cells Passing mtDNA Depth > 20 Threshold"
+    )
+
+# Combine the two plots using patchwork and share the legend at the bottom
+combined_plot <- (gRNA_barchart / proportion_barchart) +
+    plot_layout(heights = c(2, 1), guides = "collect") +
+    plot_annotation() & theme(legend.position = "bottom")
+
+combined_plot
+
+ggsave(
+    here::here(plot_dir, "mtDNA_cells_passing_depth_threshold_by_gRNA.pdf"),
+    plot = combined_plot,
+    width = 10,
+    height = 8
+)
+```
+
+The gRNAs associated with mtDNA copy number reduction also show the greatest drop of cells passing the mtDNA depth > 20 threshold.
+
+| gRNA   | Total Cells | Cells Passing Threshold | Proportion Passing |
+|:-------|------------:|-----------------------:|------------------:|
+| `Tfam` | `r gRNA_cell_counts$total_cells[gRNA_cell_counts$top_guide_final_enrich_combined == "Tfam"]` | `r gRNA_cell_counts$cells_passing_threshold[gRNA_cell_counts$top_guide_final_enrich_combined == "Tfam"]` | `r round(gRNA_cell_counts$proportion_passing[gRNA_cell_counts$top_guide_final_enrich_combined == "Tfam"], 2)` |
+| `Polg` | `r gRNA_cell_counts$total_cells[gRNA_cell_counts$top_guide_final_enrich_combined == "Polg"]` | `r gRNA_cell_counts$cells_passing_threshold[gRNA_cell_counts$top_guide_final_enrich_combined == "Polg"]` | `r round(gRNA_cell_counts$proportion_passing[gRNA_cell_counts$top_guide_final_enrich_combined == "Polg"], 2)` |
+| `Opa1`  | `r gRNA_cell_counts$total_cells[gRNA_cell_counts$top_guide_final_enrich_combined == "Opa1"]`  | `r gRNA_cell_counts$cells_passing_threshold[gRNA_cell_counts$top_guide_final_enrich_combined == "Opa1"]`  | `r round(gRNA_cell_counts$proportion_passing[gRNA_cell_counts$top_guide_final_enrich_combined == "Opa1"], 2)`  |
+
+Applying a read depth threshold increases the accuracy of the per-cell heteroplasmy calls, which is an important consideration for downstream analyses that aim to identify subtle shifts in mean heteroplasmy. However, in the context of gene perturbations that result in a depletion of mtDNA copy number, it also risks losing genuine biological signal by excluding the cells with the most pronounced perturbations.
+
+### Heteroplasmy variance by gRNA
+
+```{r}
+#| label: fig-het-variance-by-gRNA
+#| fig-cap: "Bar plot showing the variance of heteroplasmy levels across different gRNA perturbations."
+#| fig-align: center
+#| fig-fullwidth: true
+
+# Calculate the variance of heteroplasmy for each gRNA
+het_variance <- mtDNA_data %>%
+    group_by(top_guide_final_enrich_combined) %>%
+    dplyr::summarise(variance = var(Heteroplasmy_all_5024, na.rm = TRUE)) %>%
+    arrange(desc(variance))
+
+# Create a bar plot of the variance
+variance_plot <- ggplot(
+    het_variance,
+    aes(
+        y = reorder(top_guide_final_enrich_combined, variance),
+        x = variance,
+        fill = top_guide_final_enrich_combined
+    )) +
+    geom_bar(stat = "identity") +
+    theme_minimal() +
+    theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 0, hjust = 1)) +
+    ylab("Guide RNAs") +
+    xlab("Heteroplasmy Variance") +
+    scale_fill_manual(values = col_pal)
+
+variance_plot
+
+ggsave(
+    here(plot_dir, "mtDNA_het_variance_by_gRNA.pdf"),
+    plot = variance_plot,
+    width = 8,
+    height = 6
+)
+```
+
+We used the Brown-Forsythe test to compare heteroplasmy variance between each gRNA and pooled `Control` gRNAs (`Eomes`, `Neurod1`, `Olig1`, `Opn4`, `Rgr`, `Rrh`, `NT`). P-values were adjusted for multiple testing using the Holm method. Significant results (p.adj.holm < 0.05) are highlighted in the table below.
+
+```{r}
+#| label: brown-forsythe-test-het-variance
+#| echo: true
+#| code-summary: "Pairwise Brown-Forsythe test for heteroplasmy variance between each gRNA and Control gRNAs"
+
+mtDNA_data_non_control <- mtDNA_data %>%
+    filter(group != "Control") %>%
+    drop_na(Heteroplasmy_all_5024)
+
+mtDNA_data_control <- mtDNA_data %>%
+    filter(group == "Control") %>%
+    drop_na(Heteroplasmy_all_5024)
+
+non_control_gRNAs <- unique(
+    mtDNA_data_non_control$top_guide_final_enrich_combined)
+
+# Run pairwise Brown-Forsythe tests
+pairwise_var_test <- map_dfr(
+    non_control_gRNAs, function(gRNA) {
+
+    gRNA_data <- mtDNA_data_non_control %>%
+        filter(top_guide_final_enrich_combined == gRNA)
+
+    pair_data <- bind_rows(
+        gRNA_data %>% mutate(Group = gRNA),
+        mtDNA_data_control %>% mutate(Group = "Control")
+    ) %>%
+        mutate(Group = factor(Group))
+
+    bf_test <- leveneTest(
+        Heteroplasmy_all_5024 ~ Group,
+        data = pair_data,
+        center = median
+    )
+
+    data.frame(
+        gRNA = as.character(gRNA),
+        p_value = bf_test$`Pr(>F)`[1]
+    )
+})
+
+# Apply Holm correction
+pairwise_results <- pairwise_var_test %>%
+    filter(!is.na(p_value)) %>%
+    mutate(
+        p.adj.holm = p.adjust(p_value, method = "holm"),
+        significant = p.adj.holm < 0.05
+    ) %>%
+    arrange(p.adj.holm)
+```
+
+```{r}
+#| label: brown-forsythe-test-table
+
+# Display table
+pairwise_results %>%
+    mutate(
+        p_value = formatC(p_value, format = "e", digits = 2),
+        p.adj.holm = formatC(p.adj.holm, format = "e", digits = 2)
+    ) %>%
+    select(-significant) %>%
+    kbl(
+        format = "html",
+        caption = "Pairwise Brown-Forsythe Test for Heteroplasmy Variance (gRNA vs Control)",
+        col.names = c("gRNA", "p-value", "p.adj (Holm)"),
+        align = "c"
+    ) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+    column_spec(
+        3,  # p.adj.holm column
+        background = ifelse(
+            pairwise_results$significant,
+            custom_salmon,
+            "white"
+        )
+    )
+```
+
+<br>
+
+The gRNA KO groups for `Tfam`, `Opa1`, `Polg`, and `Dnm1l` show significantly increased heteroplasmy variance compared to `Control` gRNAs (Holm-adjusted p-value < 0.05).
+
+### Heteroplasmy variance by Mixscape class
+
+Mixscape is a computational method that classifies cells as knockout (KO) or non-perturbed (NP) based on their transcriptional perturbation signature. This classification allows us to distinguish cells with successful gene knockdowns from cells that received the gRNA but show no transcriptional perturbation, providing an internal control for off-target effects within each gRNA group.
+
+```{r}
+#| label: fig-mixscape-het-variance
+#| fig-cap: "Heteroplasmy variance by Mixscape classification. Bar plot shows variance for knockout (KO) and non-perturbed (NP) cells within each gRNA group. KO cells generally show higher variance than their NP counterparts."
+#| fig-align: center
+#| fig-fullwidth: true
+
+# Subset to genes of interest
+mixscape_data <- mixscape_data %>%
+    filter(str_detect(mixscape_class, "Tfam|Opa1|Polg|Atg5"))
+
+# Calculate the heteroplasmy variance for each Mixscape class
+mixscape_het_variance <- mixscape_data %>%
+    group_by(mixscape_class) %>%
+    dplyr::summarise(variance = var(Heteroplasmy_all_5024, na.rm = TRUE))
+
+# Arrange mixscape classes by variance of KO groups
+ko_df <- mixscape_het_variance %>%
+    filter(str_detect(mixscape_class, "KO")) %>%
+    arrange(desc(variance))
+np_df <- mixscape_het_variance %>% filter(str_detect(mixscape_class, "NP"))
+
+# Build the custom order based on KO variance
+custom_order <- unlist(lapply(ko_df$mixscape_class, function(ko_class) {
+    gene <- str_remove(ko_class, " KO")
+    np_class <- paste0(gene, " NP")
+    c(ko_class, np_class)
+    }
+))
+
+# Set factor levels
+mixscape_het_variance$mixscape_class <- factor(
+    mixscape_het_variance$mixscape_class,
+    levels = rev(custom_order)
+)
+
+# Set colors for Mixscape classes
+if (!is.null(col_pal)) {
+    group_colors <- setNames(
+        sapply(custom_order, function(class) {
+            gene <- str_remove(class, " (KO|NP)")
+            sat <- if (str_detect(class, "KO")) 1 else 0.6
+            scales::alpha(shades::saturation(col_pal[gene], sat), 0.6)
+        }),
+        custom_order
+    )
+}
+# Create a bar plot of the variance
+mixscape_variance_plot <- ggplot(
+    mixscape_het_variance,
+    aes(
+        y = mixscape_class,
+        x = variance,
+        fill = mixscape_class
+    )) +
+    geom_bar(stat = "identity") +
+    theme_minimal() +
+    theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 0, hjust = 1)) +
+    ylab("Mixscape Classes") +
+    xlab("Heteroplasmy Variance") +
+    scale_fill_manual(values = group_colors)
+
+mixscape_variance_plot
+
+ggsave(
+    here::here(plot_dir, "mtDNA_het_variance_by_mixscape_class.pdf"),
+    plot = mixscape_variance_plot,
+    width = 8,
+    height = 6
+)
+```
+
+```{r}
+#| label: het-variance-mixscape-ko-vs-np
+#| echo: true
+#| code-summary: "Pairwise Brown-Forsythe test for Mixscape KO vs NP comparison"
+
+# Brown-Forsythe test for each pair of KO vs NP
+genes <- c("Tfam", "Opa1", "Polg", "Atg5")
+
+pairwise_mixscape_var_test <- list()
+
+for (gene in genes) {
+
+    ko_label <- paste(gene, "KO")
+    np_label <- paste(gene, "NP")
+
+    ko_data <- mixscape_data %>% dplyr::filter(mixscape_class == ko_label)
+    np_data <- mixscape_data %>% dplyr::filter(mixscape_class == np_label)
+
+    pair_data <- bind_rows(
+        ko_data %>% mutate(Group = "KO"),
+        np_data %>% mutate(Group = "NP")
+    )
+
+    pair_data <- pair_data %>%
+        mutate(Group = factor(Group))
+
+    if (nrow(ko_data) > 0 && nrow(np_data) > 0) {
+        BF_test <- car::leveneTest(
+            Heteroplasmy_all_5024 ~ Group,
+            data = pair_data,
+            center = median
+        )
+        p_val <- BF_test$`Pr(>F)`[1]
+    } else {
+        p_val <- NA
+    }
+
+    pairwise_mixscape_var_test[[gene]] <- data.frame(
+        gRNA = gene,
+        p_value = p_val
+    )
+}
+
+pairwise_mixscape_var_test_df <- bind_rows(pairwise_mixscape_var_test) %>%
+    dplyr::filter(!is.na(p_value)) %>%
+    mutate(
+        p.adj.holm = p.adjust(p_value, method = "holm"),
+        significant = p.adj.holm < 0.05
+    ) %>%
+    arrange(p.adj.holm)
+
+pairwise_mixscape_var_test_df %>%
+    mutate(
+        p_value = formatC(p_value, format = "e", digits = 2),
+        p.adj.holm = formatC(p.adj.holm, format = "e", digits = 2)
+    ) %>%
+    select(-significant) %>%
+    kbl(
+        format = "html",
+        caption = "Pairwise Brown-Forsythe Test: KO vs NP Heteroplasmy Variance (Mixscape)",
+        col.names = c("gRNA", "p-value", "p.adj (Holm)"),
+        align = "c"
+    ) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+    column_spec(
+        3,  # p.adj.holm column
+        background = ifelse(
+            as.numeric(pairwise_mixscape_var_test_df$p.adj.holm) < 0.05,
+            custom_salmon,
+            "white"
+        )
+    )
+```
+
+### Heteroplasmy variance by mtDNA depth
+
+To visualize the relationship between mtDNA coverage and heteroplasmy variance,
+we binned all cells into 100 quantile-based bins (equal number of cells per bin)
+based on mtDNA depth. For each bin, we calculated the mean mtDNA depth and
+heteroplasmy variance, then fit a LOESS curve to approximate the technical
+variance-depth relationship. Individual gRNA perturbation means (colored points)
+are overlaid to identify perturbations that deviate from the baseline technical trend.
+
+```{r}
+#| label: fig-het-variance-by-depth
+#| fig-cap: "Relationship between mtDNA depth and heteroplasmy variance. Gray points represent 100 quantile-based bins across all cells. Blue LOESS curve shows the technical variance-depth trend. Colored points show mean variance and depth for each gRNA perturbation. TFAM, POLG, and OPA1 (labeled) deviate substantially from the baseline technical trend."
+
+n_bins <- 100
+
+mtDNA_depth_het_bins <- mtDNA_data %>%
+    dplyr::mutate(depth_bin = cut_number(mtDNA_depth, n = n_bins, labels = FALSE)) %>%
+    group_by(depth_bin) %>%
+    dplyr::summarise(
+        n_cells = n(),
+        mean_depth = mean(mtDNA_depth, na.rm = TRUE),
+        var_het = var(Heteroplasmy_all_5024, na.rm = TRUE)
+    )
+
+label_data <- mtDNA_data_by_gRNA %>%
+    filter(group %in% c("Tfam", "Polg", "Opa1"))
+
+annotations <- lapply(1:nrow(label_data), function(i) {
+    list(
+        x = label_data$mean_depth[i],
+        y = label_data$var_het[i] + 0.02,
+        text = as.character(label_data$group[i]),
+        showarrow = FALSE,
+        font = list(color = col_pal[label_data$group[i]], size = 12),
+        xref = "x",
+        yref = "y"
+    )
+})
+
+annotations[[length(annotations) + 1]] <- list(
+    x = 0.72, y = -0.25,
+    text = "Hover over the points for details",
+    showarrow = FALSE,
+    font = list(size = 12, color = "gray"),
+    xref = "paper", yref = "paper",
+    xanchor = "left", yanchor = "top", align = "left"
+)
+
+mtDNA_depth_het_plot <- ggplot(
+    mtDNA_depth_het_bins,
+    aes(x = mean_depth, y = var_het)
+) +
+    geom_point(alpha = 0.6, aes(text = paste("Mean Depth:", mean_depth, "<br>Variance:", var_het))) +
+    geom_smooth(method = "loess", se = TRUE, color = "royalblue", alpha = 0.2) +
+    geom_point(
+        data = mtDNA_data_by_gRNA,
+        aes(x = mean_depth, y = var_het, color = group, text = paste("Group:", group, "<br>Mean Depth:", mean_depth, "<br>Variance:", var_het)),
+        size = 3,
+        shape = 19
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none") +
+    scale_color_manual(values = col_pal) +
+    scale_x_continuous(
+        breaks = seq(0, max(mtDNA_depth_het_bins$mean_depth, na.rm = TRUE), by = 25)
+    ) +
+    xlab("Mean mtDNA Depth") +
+    ylab("Heteroplasmy Variance")
+
+# Convert to plotly and add only the three labels as annotations
+ggplotly(mtDNA_depth_het_plot, tooltip = c("text")) %>%
+    layout(
+        title = "Heteroplasmy Variance vs Mean mtDNA Depth",
+        xaxis = list(title = "Mean mtDNA Depth"),
+        yaxis = list(title = "Heteroplasmy Variance"),
+        margin = list(l = 50, r = 50, t = 50, b = 100),
+        annotations = annotations
+    )
+```
+
+### Linear Modeling of Heteroplasmy Variance by gRNA and mtDNA Depth
+
+To distinguish technical from biological effects on heteroplasmy variance, we fit a weighted linear interaction model. Since variance is a population-level metric, we model heteroplasmy deviation at the single-cell level, defined as each cell's absolute distance from its gRNA group's median:
+
+$$ d_{i} = | \ h_{i} - \text{median}(h_{\text{gRNA}_i}) \ |$$
+
+where $h_i$ is the heteroplasmy of cell $i$, and the median is calculated across all cells with the same gRNA perturbation.
+
+Model specification:
+
+$$ d_i = \beta_0 + \beta_{\text{gRNA}_i} + \beta_{\text{depth}} \cdot \text{depth}_i + \beta_{\text{gRNA}_i \times \text{depth}} \cdot \text{depth}_i + \epsilon_i$$
+
+This model tests three effects:
+
+- $\beta_0$ (intercept): Baseline heteroplasmy deviation in NT cells at depth = 0
+- $\beta_{\text{gRNA}_i}$ (main gRNA effect): Change in heteroplasmy deviation associated with each gRNA perturbation, independent of mtDNA depth
+- $\beta_{\text{depth}}$ (main depth effect): Change in heteroplasmy deviation associated with increasing mtDNA depth, independent of gRNA perturbation
+- $\beta_{\text{gRNA}_i \times \text{depth}}$ (interaction effect): Modification of the depth effect for each gRNA perturbation
+
+Weights are empirical measurement variances derived from heteroplasmy-depth
+simulations. We calculated weights as the inverse of measurement variance
+($w_i = 1/\sigma^2_i$) and normalized by dividing by the maximum weight. This approach down-weights cells with low mtDNA depth, where technical noise is substantial, and up-weights cells with high mtDNA depth, where heteroplasmy estimates are more reliable.
+
+```{r}
+#| label: linear-modelling-het-variance-by-depth
+#| echo: true
+#| code-summary: "Fit weighted linear model: deviation ~ gRNA × mtDNA_depth"
+
+# Data preparation
+modeling_df <- mtDNA_data %>%
+    dplyr::filter(!is.na(Heteroplasmy_all_5024), !is.na(mtDNA_depth)) %>%
+    dplyr::group_by(top_guide_final_enrich_combined) %>%
+    dplyr::mutate(
+        median_het = median(Heteroplasmy_all_5024),
+        deviation = abs(Heteroplasmy_all_5024 - median_het)
+    ) %>%
+    ungroup()
+
+# Set reference level and calculate empirical weights
+modeling_df$top_guide_final_enrich_combined <- relevel(
+    modeling_df$top_guide_final_enrich_combined, ref = "NT"
+)
+
+modeling_df$measurement_var <- get_measurement_variance(modeling_df$mtDNA_depth)
+modeling_df$weight_empirical <- 1 / modeling_df$measurement_var
+modeling_df$weight_empirical <- modeling_df$weight_empirical / max(modeling_df$weight_empirical)
+
+# Fit weighted linear model
+mdl_empirical_weighted <- lm(
+    deviation ~ top_guide_final_enrich_combined * mtDNA_depth,
+    data = modeling_df,
+    weights = weight_empirical
+)
+```
+
+```{r}
+#| label: linear-model-results
+
+# ANOVA table
+anova(mdl_empirical_weighted) %>%
+    broom::tidy() %>%
+    mutate(
+        term = str_replace(term, "top_guide_final_enrich_combined", "gRNA"),
+        across(c(sumsq, meansq, statistic), ~ round(.x, 4)),
+        p.value = format.pval(p.value, digits = 3, eps = 0.001)
+    ) %>%
+    kbl(
+        format = "html",
+        caption = "ANOVA: Heteroplasmy Variance by gRNA and mtDNA Depth",
+        col.names = c("Term", "df", "Sum Sq", "Mean Sq", "F statistic", "p-value"),
+        align = "c"
+    ) %>%
+    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+The ANOVA results demonstrate that both gRNA identity and mtDNA depth significantly influence heteroplasmy variance (both p < 0.001). Importantly, the significant interaction term (gRNA × mtDNA depth, p < 0.001) indicates that the relationship between mtDNA depth and heteroplasmy variance differs across gRNA perturbations.
+
+```{r}
+#| label: linear-model-coefficients
+
+# Coefficient table - significant terms only
+broom::tidy(mdl_empirical_weighted) %>%
+    filter(p.value < 0.05, term != "(Intercept)") %>%
+    mutate(
+        term = str_remove(term, "top_guide_final_enrich_combined"),
+        term_type = case_when(
+            str_detect(term, ":mtDNA_depth") ~ "Interaction",
+            term == "mtDNA_depth" ~ "Technical (Depth)",
+            TRUE ~ "Biological (gRNA)"
+        ),
+        ci_lower = estimate - 1.96 * std.error,
+        ci_upper = estimate + 1.96 * std.error,
+        across(c(estimate, std.error, ci_lower, ci_upper, statistic), ~ round(.x, 5)),
+        p.value = format.pval(p.value, digits = 3, eps = 0.001)
+    ) %>%
+    arrange(term_type, term) %>%
+    select(term_type, term, estimate, std.error, ci_lower, ci_upper, statistic, p.value) %>%
+    kbl(
+        format = "html",
+        caption = "Significant Effects: Heteroplasmy Variance Model (p < 0.05)",
+        col.names = c("Type", "Term", "Estimate", "SE", "CI Lower", "CI Upper", "t-stat", "p-value"),
+        align = c("l", "l", "c", "c", "c", "c", "c", "c")
+    ) %>%
+    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+The coefficient table reveals that TFAM, POLG, and OPA1 show the strongest main effects on heteroplasmy variance, with positive coefficients indicating increased deviation from median heteroplasmy compared to non-targeting controls. The significant negative interaction terms for these genes (e.g., Tfam:mtDNA_depth) indicate that their variance-increasing effect is more pronounced at lower mtDNA depths, consistent with these perturbations causing both mtDNA depletion and increased stochasticity. This directly addresses the reviewer's question: cells with low mtDNA coverage show higher variance, particularly in perturbations that deplete mtDNA copy number.
+
+```{r}
+#| label: mixscape-weighted-linear-model
+#| echo: true
+#| code-summary: "Fit weighted linear model for Mixscape data: deviation ~ group × mtDNA_depth"
+
+# Prepare Mixscape data
+mixscape_modeling_df <- mixscape_data %>%
+    filter(str_detect(mixscape_class, "Tfam|Opa1|Polg|Atg5")) %>%
+    filter(!is.na(Heteroplasmy_all_5024), !is.na(mtDNA_depth)) %>%
+    group_by(mixscape_class) %>%
+    mutate(
+        median_het = median(Heteroplasmy_all_5024),
+        deviation = abs(Heteroplasmy_all_5024 - median_het)
+    ) %>%
+    ungroup() %>%
+    mutate(
+        comparison_group = if_else(
+            str_detect(mixscape_class, "NP$"),
+            "NP Control",
+            str_replace(mixscape_class, " ", "_")
+        )
+    )
+
+# Set reference and calculate weights
+mixscape_modeling_df$comparison_group <- relevel(
+    as.factor(mixscape_modeling_df$comparison_group),
+    ref = "NP Control"
+)
+
+mixscape_modeling_df$measurement_var <- get_measurement_variance(
+    mixscape_modeling_df$mtDNA_depth
+)
+mixscape_modeling_df$weight_empirical <- 1 / mixscape_modeling_df$measurement_var
+mixscape_modeling_df$weight_empirical <- mixscape_modeling_df$weight_empirical /
+    max(mixscape_modeling_df$weight_empirical, na.rm = TRUE)
+
+# Fit model
+mdl_mixscape_weighted <- lm(
+    deviation ~ comparison_group * mtDNA_depth,
+    data = mixscape_modeling_df,
+    weights = weight_empirical
+)
+```
+
+```{r}
+#| label: mixscape-linear-model-results
+
+# ANOVA table
+anova(mdl_mixscape_weighted) %>%
+    broom::tidy() %>%
+    mutate(
+        term = str_replace(term, "comparison_group", "Mixscape Class"),
+        across(c(sumsq, meansq, statistic), ~ round(.x, 4)),
+        p.value = format.pval(p.value, digits = 3, eps = 0.001)
+    ) %>%
+    kbl(
+        format = "html",
+        caption = "ANOVA: Heteroplasmy Variance by Mixscape Class and mtDNA Depth",
+        col.names = c("Term", "df", "Sum Sq", "Mean Sq", "F statistic", "p-value"),
+        align = "c"
+    ) %>%
+    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# Coefficient table - significant terms only
+broom::tidy(mdl_mixscape_weighted) %>%
+    filter(p.value < 0.05, term != "(Intercept)") %>%
+    mutate(
+        term = str_remove(term, "comparison_group"),
+        term_type = case_when(
+            str_detect(term, ":mtDNA_depth") ~ "Interaction",
+            term == "mtDNA_depth" ~ "Technical (Depth)",
+            TRUE ~ "Biological (Mixscape Class)"
+        ),
+        ci_lower = estimate - 1.96 * std.error,
+        ci_upper = estimate + 1.96 * std.error,
+        across(c(estimate, std.error, ci_lower, ci_upper, statistic), ~ round(.x, 5)),
+        p.value = format.pval(p.value, digits = 3, eps = 0.001)
+    ) %>%
+    arrange(term_type, term) %>%
+    select(term_type, term, estimate, std.error, ci_lower, ci_upper, statistic, p.value) %>%
+    kbl(
+        format = "html",
+        caption = "Significant Effects: Mixscape Heteroplasmy Variance Model (p < 0.05)",
+        col.names = c("Type", "Term", "Estimate", "SE", "CI Lower", "CI Upper", "t-stat", "p-value"),
+        align = c("l", "l", "c", "c", "c", "c", "c", "c")
+    ) %>%
+    kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+```
+
+The Mixscape linear model confirms that the observed effects are not driven by off-target artifacts. By comparing knockout (KO) cells to non-perturbed (NP) cells within the same gRNA group, we control for any gRNA-specific effects unrelated to the intended gene knockout. The significant main effects for Tfam_KO, Opa1_KO, and Polg_KO (all with positive coefficients and p < 0.001) demonstrate that cells with successful knockouts show genuinely increased heteroplasmy variance compared to cells that received the same gRNA but were not perturbed. This validates that the variance increases observed in Section 4 reflect true biological effects of mitochondrial gene perturbations rather than off-target or transfection-related artifacts.
+
+### Simulation-Based Variance Decomposition
+
+To distinguish technical from biological sources of heteroplasmy variance, we performed binomial sampling simulations to model the expected variance arising purely from technical noise at reduced mtDNA depths.
+
+For each gRNA perturbation, we:
+
+1. Sampled control cells (without replacement) to match the gRNA group size. \
+2. Assigned each sampled cell a sequencing depth at the heteroplasmic sites (m.5024) drawn from the gRNA depth distribution (with replacement). \
+3. Simulated alternative allele counts via binomial sampling: $X_i \sim \text{Binomial}(n = \text{depth}_{\text{5024}, i}, \ p = \text{het}_{\text{control}, i})$ \
+4. Calculated simulated heteroplasmy: $\text{het}_{\text{sim}, i} = X_i / \text{depth}_{\text{5024}, i}$ \
+5. Computed variance of simulated heteroplasmies across all cells,
+6. Repeated 5,000 times to generate a null distribution of technical variance
+
+We tested whether observed variance exceeds the simulated technical variance using a one-tailed test:
+
+- $H_0$: Observed variance ≤ Simulated technical variance (technical noise only)
+- $H_1$: Observed variance > Simulated technical variance (biological effect present)
+- p-value: Proportion of simulations where simulated variance ≥ observed variance
+
+A significant result (p < 0.05) indicates that the observed heteroplasmy variance cannot be fully explained by technical sampling noise at reduced coverage, providing evidence for a biological bottleneck effect.
+
+::: {.callout-note appearance="simple"}
+Control group included cells with the following gRNA: `Eomes`, `Neurod1`, `Olig1`, `Opn4`, `Rgr`, `Rrh`, `NT`
+:::
+
+```{r}
+#| label: heteroplasmy-variance-simulation-function
+#| echo: true
+#| code-summary: "Function to simulate heteroplasmy variance for a given gRNA perturbation"
+
+simulate_het_for_gRNA <- function(
+    mtDNA_data,
+    gRNA_name,
+    n_perms = 5000,
+    n_sim_points_to_plot = 2000,
+    col_pal = NULL
+) {
+
+    # Filter KO and Control data
+    KO_df <- mtDNA_data %>%
+        dplyr::filter(top_guide_final_enrich_combined == gRNA_name) %>%
+        dplyr::select(Heteroplasmy_all_5024, mtDNA_depth, Depth_all_5024) %>%
+        dplyr::filter(
+            Depth_all_5024 >= 0,
+            Heteroplasmy_all_5024 >= 0,
+            Heteroplasmy_all_5024 <= 1) %>%
+        drop_na() %>%
+        dplyr::mutate(group = gRNA_name)
+
+    control_df <- mtDNA_data %>%
+        dplyr::filter(group == "Control") %>%
+        dplyr::select(Heteroplasmy_all_5024, mtDNA_depth, Depth_all_5024) %>%
+        dplyr::filter(
+            Depth_all_5024 >= 0,
+            Heteroplasmy_all_5024 >= 0,
+            Heteroplasmy_all_5024 <= 1) %>%
+        drop_na() %>%
+        dplyr::mutate(group = "Control")
+
+    # Combine KO and Control data
+    sim_input_df <- bind_rows(KO_df, control_df)
+
+    # Get observed stats
+    sim_input_stats <- sim_input_df %>%
+        group_by(group) %>%
+        dplyr::summarise(
+            n_cells = n(),
+            mean_depth = mean(Depth_all_5024, na.rm = TRUE),
+            var_het = var(Heteroplasmy_all_5024, na.rm = TRUE)
+        )
+
+    obs_ko_var <- sim_input_stats %>% dplyr::filter(group == gRNA_name) %>% dplyr::pull(var_het)
+    obs_control_var <- sim_input_stats %>% dplyr::filter(group == "Control") %>% dplyr::pull(var_het)
+
+    all_sim_var <- numeric(n_perms)
+    all_sim_hets_list <- vector("list", n_perms)
+    all_input_hets_list <- vector("list", n_perms)
+
+    # Iterate through each permutation
+    for (perm in seq_len(n_perms)) {
+
+        # Sample cells from control group equal to the number of cells in KO group
+        control_sample <- sim_input_df %>%
+            dplyr::filter(group == "Control") %>%
+            sample_n(
+                min(nrow(control_df), nrow(KO_df)),
+                replace = FALSE) %>%
+            dplyr::mutate(group = "Control")
+
+        # Sample mtDNA depths from KO group
+        sampled_depths <- sample(KO_df$Depth_all_5024,
+                                    size = nrow(control_sample),
+                                    replace = TRUE)
+
+        # Sample heteroplasmy levels from control group
+        sampled_hets <- control_sample$Heteroplasmy_all_5024
+        all_input_hets_list[[perm]] <- sampled_hets
+
+        # Simulate mtDNA copy number
+        sim_alt_counts <- numeric(nrow(control_sample))
+        sim_hets <- rep(NA_real_, nrow(control_sample))
+        valid_indices <- which(sampled_depths > 0)
+
+        # Simulate alt counts for valid indices
+        # where sampled_depths > 0
+        if (length(valid_indices) > 0) {
+            sim_alt_counts[valid_indices] <- rbinom(
+                n = length(valid_indices),
+                size = sampled_depths[valid_indices],
+                prob = sampled_hets[valid_indices]
+            )
+            # Calculate heteroplasmy for valid indices
+            sim_hets[valid_indices] <- sim_alt_counts[valid_indices] / sampled_depths[valid_indices]
+        }
+        all_sim_var[perm] <- var(sim_hets, na.rm = TRUE)
+        all_sim_hets_list[[perm]] <- sim_hets[!is.na(sim_hets)]
+    }
+
+    # Flatten the list of simulated heteroplasmies
+    all_sim_hets_flat <- na.omit(unlist(all_sim_hets_list))
+
+    # Observed KO stats
+    obs_ko_homoplasmy_prop <- mean(KO_df$Heteroplasmy_all_5024 %in% c(0,1), na.rm = TRUE)
+    obs_ko_mean_het <- mean(KO_df$Heteroplasmy_all_5024, na.rm = TRUE)
+
+    # Simulated stats
+    sim_ko_homoplasmy_prop <- mean(all_sim_hets_flat %in% c(0,1), na.rm = TRUE)
+    sim_ko_mean_het <- mean(all_sim_hets_flat, na.rm = TRUE)
+    sim_ko_var <- var(all_sim_hets_flat, na.rm = TRUE)
+
+    # Empirical p-value (one-tailed): proportion of simulated variances >= observed KO variance
+    p_val <- mean(all_sim_var >= obs_ko_var) # (simulated variance >= observed variance)
+
+    plot_df_hets <- data.frame(
+        Heteroplasmy = c(
+            control_df$Heteroplasmy_all_5024,
+            all_sim_hets_flat,
+            KO_df$Heteroplasmy_all_5024
+        ),
+        Group = factor(c(
+            rep("Control", nrow(control_df)),
+            rep("Simulated", length(all_sim_hets_flat)),
+            rep(gRNA_name, nrow(KO_df))
+        ), levels = c("Control", "Simulated", gRNA_name))
+    )
+
+    # Subsample points to avoid cluttering
+    # Set the number of points to plot for the jitter layer
+    n_sim_points <- min(length(all_sim_hets_flat), n_sim_points_to_plot)
+
+    # Filter the main dataframe, subsample only the 'Simulated' group
+    jitter_data <- plot_df_hets %>%
+        group_by(Group) %>%
+        # If the group is 'Simulated', sample n_sim_points, otherwise take all rows
+        dplyr::filter(
+            if (cur_group()$Group == "Simulated") row_number() %in% sample(row_number(), n_sim_points) else TRUE
+        ) %>%
+        ungroup()
+
+    # Set colors for Control, Simulated, and gRNA
+    if (!is.null(col_pal)) {
+        group_colors <- c(
+            "Control" = scales::alpha(shades::saturation(col_pal["NT"], 0.8), 0.6),
+            "Simulated" = scales::alpha(shades::saturation(col_pal[gRNA_name], 0.4), 0.6),
+            gRNA_name = scales::alpha(shades::saturation(col_pal[gRNA_name], 0.8), 0.6)
+        )
+        names(group_colors)[3] <- gRNA_name
+    } else {
+        group_colors <- c(
+            "Control" = "#2CA02CFF",
+            "Simulated" = "#1F77B4FF",
+            gRNA_name = "#D62728FF"
+        )
+        names(group_colors)[3] <- gRNA_name
+    }
+
+    het_dist_sim <- ggplot(
+        plot_df_hets,
+        aes(x = Group, y = Heteroplasmy, fill = Group)
+    ) +
+        geom_violin(
+            data = jitter_data,
+            width = 1.2,
+            alpha = 0.3,
+            color = NA
+        ) +
+        geom_jitter(
+            data = jitter_data,
+            width = 0.15,
+            size = 1.2,
+            alpha = 0.3,
+            aes(color = Group)
+        ) +
+        geom_boxplot(
+            data = jitter_data,
+            width = 0.2,
+            outlier.shape = NA,
+            alpha = 0.6,
+            position = "identity"
+        ) +
+        scale_fill_manual(values = group_colors) +
+        scale_color_manual(values = group_colors) +
+        theme_minimal(base_size = 14) +
+        labs(
+            title = paste("Distribution of Heteroplasmies (", gRNA_name, " KO Simulation)", sep = ""),
+            x = NULL,
+            y = "Heteroplasmy (m.5024)"
+        ) +
+        theme(legend.position = "none")
+
+    return(list(
+        plot = het_dist_sim,
+        sim_input_stats = sim_input_stats,
+        all_sim_var = all_sim_var,
+        all_sim_hets_list = all_sim_hets_list,
+        obs_ko_mean_het = obs_ko_mean_het,
+        obs_ko_var = obs_ko_var,
+        obs_ko_homoplasmy_prop = obs_ko_homoplasmy_prop,
+        sim_ko_mean_het = sim_ko_mean_het,
+        sim_ko_var = sim_ko_var,
+        sim_ko_homoplasmy_prop = sim_ko_homoplasmy_prop,
+        p_value= p_val
+    ))
+}
+```
+
+```{r}
+#| label: run-heteroplasmy-simulations
+#| fig-align: center
+#| fig-fullwidth: true
+#| cache: true
+
+gRNA_list <- levels(mtDNA_data$top_guide_final_enrich_combined)
+
+het_sim_results <- map(gRNA_list, ~ {
+    simulate_het_for_gRNA(
+        mtDNA_data = mtDNA_data,
+        gRNA_name = .x,
+        n_perms = 5000,
+        n_sim_points_to_plot = 2000,
+        col_pal = col_pal
+    )
+})
+het_sim_results <- set_names(het_sim_results, gRNA_list)
+```
+
+```{r}
+#| label: heteroplasmy-simulation-summary
+#| cache: true
+
+het_sim_summary <- bind_rows(
+    lapply(names(het_sim_results), function(gRNA) {
+        res <- het_sim_results[[gRNA]]
+        data.frame(
+            gRNA = gRNA,
+            obs_ko_mean_het = res$obs_ko_mean_het,
+            sim_ko_mean_het = res$sim_ko_mean_het,
+            obs_ko_var = res$obs_ko_var,
+            sim_ko_var = res$sim_ko_var,
+            obs_ko_homoplasmy_prop = res$obs_ko_homoplasmy_prop,
+            sim_ko_homoplasmy_prop = res$sim_ko_homoplasmy_prop,
+            p_value = res$p_value
+        )
+    })
+)
+
+het_sim_summary <- het_sim_summary %>%
+    dplyr::rename(
+        `gRNA` = gRNA,
+        `Observed Mean Heteroplasmy` = obs_ko_mean_het,
+        `Simulated Mean Heteroplasmy` = sim_ko_mean_het,
+        `Observed Heteroplasmy Variance` = obs_ko_var,
+        `Simulated Heteroplasmy Variance` = sim_ko_var,
+        `Observed Homoplasmy Proportion` = obs_ko_homoplasmy_prop,
+        `Simulated Homoplasmy Proportion` = sim_ko_homoplasmy_prop,
+        `p-value` = p_value
+    )
+
+
+het_sim_summary %>%
+    { colnames(.) <- rep(" ", ncol(.)); . } %>%
+    kbl(
+        format = "html",
+        caption = "Summary of Observed and Simulated Heteroplasmy Metrics",
+        align = "c"
+    ) %>%
+    kable_styling(full_width = FALSE) %>%
+    add_header_above(
+        c(
+            "gRNA" = 1,
+            "Mean Heteroplasmy" = 2,
+            "Heteroplasmy Variance" = 2,
+            "Homoplasmy Proportion" = 2,
+            "p-value" = 1
+        )
+    ) %>%
+    column_spec(
+        which(colnames(het_sim_summary) == "p-value"),
+        background = ifelse(
+            is.na(as.numeric(het_sim_summary$`p-value`)),
+                "white",
+            ifelse(
+                as.numeric(het_sim_summary$`p-value`) < 0.05,
+                custom_salmon,
+                "white"
+            )
+        )
+    )
+```
+
+Only `Tfam` and `Opa1` gRNAs show a significantly higher heteroplasmy variance compared to the simulated variance from the `Control` group, suggesting that these gRNAs may have a true biological effect on heteroplasmy variance. The `Polg` gRNA does not show a significant difference, indicating that its effect on heteroplasmy variance may be similar to that of the `Control` group.
+
+```{r}
+#| label: fig-obs-vs-sim-het-distributions
+#| fig-cap: "Comparison of observed and simulated heteroplasmy distributions for TFAM, OPA1, and POLG perturbations. Violin plots show the distribution of heteroplasmy values at m.5024. 'Observed' distributions represent actual KO cells. 'Simulated' distributions represent technical variance expected from binomial sampling of control cells at KO depth distributions. TFAM and OPA1 show broader observed distributions than simulated, indicating biological variance exceeds technical noise."
+#| fig-align: center
+#| fig-fullwidth: true
+
+obs_KO_het_df <- mtDNA_data %>%
+    dplyr::filter(top_guide_final_enrich_combined %in% c("Tfam", "Opa1", "Polg")) %>%    dplyr::filter(
+        Depth_all_5024 >= 0,
+        Heteroplasmy_all_5024 >= 0,
+        Heteroplasmy_all_5024 <= 1) %>%
+    drop_na() %>%
+    dplyr::mutate(group = top_guide_final_enrich_combined) %>%
+    dplyr::select(group, Heteroplasmy_all_5024)
+
+obs_control_het_df <- mtDNA_data %>%
+    dplyr::filter(group == "Control") %>%
+    dplyr::filter(
+        Depth_all_5024 >= 0,
+        Heteroplasmy_all_5024 >= 0,
+        Heteroplasmy_all_5024 <= 1) %>%
+    drop_na() %>%
+    dplyr::select(group, Heteroplasmy_all_5024)
+
+sim_results <- list(
+    Tfam = het_sim_results$Tfam$all_sim_hets_list,
+    Opa1 = het_sim_results$Opa1$all_sim_hets_list,
+    Polg = het_sim_results$Polg$all_sim_hets_list
+)
+
+sim_KO_het_df <- imap_dfr(sim_results, ~ data.frame(
+    group = paste0("Simulated_", .y),
+    Heteroplasmy_all_5024 = unlist(.x)
+))
+
+all_het_df <- dplyr::bind_rows(
+    obs_control_het_df %>% dplyr::mutate(Group = "Control"),
+    obs_KO_het_df %>% dplyr::mutate(Group = group),
+    sim_KO_het_df %>% dplyr::mutate(Group = group)
+)
+
+all_het_df$Group <- factor(
+    all_het_df$Group,
+    levels = c("Control", "Simulated_Tfam", "Tfam", "Simulated_Opa1", "Opa1", "Simulated_Polg", "Polg")
+)
+
+group_colors <- c(
+    "Control" = scales::alpha(shades::saturation(col_pal["NT"], 0.8), 0.6),
+    "Simulated_Tfam" = scales::alpha(shades::saturation(col_pal["Tfam"], 0.4), 0.6),
+    "Tfam" = scales::alpha(shades::saturation(col_pal["Tfam"], 0.8), 0.6),
+    "Simulated_Opa1" = scales::alpha(shades::saturation(col_pal["Opa1"], 0.4), 0.6),
+    "Opa1" = scales::alpha(shades::saturation(col_pal["Opa1"], 0.8), 0.6),
+    "Simulated_Polg" = scales::alpha(shades::saturation(col_pal["Polg"], 0.4), 0.6),
+    "Polg" = scales::alpha(shades::saturation(col_pal["Polg"], 0.8), 0.6)
+)
+
+n_sim_points <- 2000
+
+jitter_data <- all_het_df %>%
+    group_by(Group) %>%
+    dplyr::mutate(
+        keep = if (grepl("^Simulated_", unique(Group))) {
+            row_number() %in% sample(row_number(), min(n_sim_points, n()))
+        } else {
+            TRUE
+        }
+    ) %>%
+    dplyr::filter(keep) %>%
+    ungroup() %>%
+    dplyr::select(-keep)
+
+het_dist_all <- ggplot(
+    all_het_df,
+    aes(x = Group, y = Heteroplasmy_all_5024, fill = Group)
+) +
+    geom_violin(
+        data = jitter_data,
+        width = 1.2,
+        alpha = 0.3,
+        color = NA
+    ) +
+    geom_jitter(
+        data = jitter_data,
+        width = 0.15,
+        size = 1.2,
+        alpha = 0.3,
+        aes(color = Group)
+    ) +
+    geom_boxplot(
+        data = jitter_data,
+        width = 0.2,
+        outlier.shape = NA,
+        alpha = 0.6
+    ) +
+    scale_fill_manual(values = group_colors) +
+    scale_color_manual(values = group_colors) +
+    scale_x_discrete(labels = c(
+        "Control" = "Control\nObserved",
+        "Simulated_Tfam" = "Tfam\nSimulated",
+        "Tfam" = "Tfam\nObserved",
+        "Simulated_Opa1" = "Opa1\nSimulated",
+        "Opa1" = "Opa1\nObserved",
+        "Simulated_Polg" = "Polg\nSimulated",
+        "Polg" = "Polg\nObserved"
+    )) +
+    theme_minimal(base_size = 14) +
+    labs(
+        x = NULL,
+        y = "Heteroplasmy (m.5024)"
+    ) +
+    theme(legend.position = "none")
+
+ggsave(
+    here::here(plot_dir, "obs_vs_sim_het_dist.pdf"),
+    plot = het_dist_all,
+    width = 8,
+    height = 6
+)
+
+het_dist_all + ggtitle("Heteroplasmy Distribution: Observed vs Simulated") +
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+#| label: fig-sim-variance-dist
+#| fig-cap: "Distribution of simulated heteroplasmy variance for TFAM, POLG, and OPA1. Histograms and density curves show 5,000 bootstrap simulations of technical variance for each gRNA. Dashed vertical lines indicate observed variance in KO cells (colored) and control cells (gray). One-tailed p-values test whether observed variance exceeds simulated technical variance. Only TFAM (p < 0.05) and OPA1 (p < 0.05) show significant excess variance, while POLG does not (p > 0.05)."
+#| fig-align: center
+#| fig-fullwidth: true
+
+sim_var_gRNA_df <- dplyr::bind_rows(
+    data.frame(Simulated_Variance = het_sim_results$Tfam$all_sim_var, gRNA = "Tfam"),
+    data.frame(Simulated_Variance = het_sim_results$Polg$all_sim_var, gRNA = "Polg"),
+    data.frame(Simulated_Variance = het_sim_results$Opa1$all_sim_var, gRNA = "Opa1")
+)
+
+obs_ko_var_gRNA <- c(
+    Tfam = het_sim_results$Tfam$sim_input_stats %>% dplyr::filter(group == "Tfam") %>% dplyr::pull(var_het),
+    Polg = het_sim_results$Polg$sim_input_stats %>% dplyr::filter(group == "Polg") %>% dplyr::pull(var_het),
+    Opa1 = het_sim_results$Opa1$sim_input_stats %>% dplyr::filter(group == "Opa1") %>% dplyr::pull(var_het)
+)
+
+obs_control_var <- het_sim_results$Tfam$sim_input_stats %>%
+    dplyr::filter(group == "Control") %>%
+    dplyr::pull(var_het)
+
+# Calculate one-tailed p-values for each gRNA
+pvals_ko <- sapply(names(obs_ko_var_gRNA),
+function(g) {
+    sim_vars <- sim_var_gRNA_df$Simulated_Variance[sim_var_gRNA_df$gRNA == g]
+    mean(sim_vars >= obs_ko_var_gRNA[g])
+})
+
+dens_max <- sim_var_gRNA_df %>%
+    split(.$gRNA) %>%
+    lapply(function(df) max(density(df$Simulated_Variance, from = 0, to = 0.1)$y)) %>%
+    unlist() %>%
+    max()
+
+# Prepare annotation data
+annotation_df <- data.frame(
+    gRNA = names(obs_ko_var_gRNA),
+    obs_var = obs_ko_var_gRNA,
+    pval = pvals_ko,
+    y = dens_max * 0.7
+)
+
+combined_sim_var_plot <- ggplot(
+    sim_var_gRNA_df,
+    aes(
+        x = Simulated_Variance,
+        fill = gRNA,
+        color = gRNA)
+    ) +
+    geom_histogram(
+        aes(y = ..density..),
+        bins = 50,
+        position = "identity",
+        alpha = 0.4
+    ) +
+    geom_density(
+        aes(y = ..density..),
+        alpha = 0.4,
+        size = 1
+    ) +
+    geom_vline(
+        data = data.frame(
+            gRNA = names(obs_ko_var_gRNA),
+            obs_var = obs_ko_var_gRNA
+        ),
+        aes(xintercept = obs_var, color = gRNA),
+        linetype = "dashed",
+        size = 1
+    ) +
+    geom_vline(
+        xintercept = obs_control_var,
+        color = col_pal["Oma1"],
+        linetype = "dashed",
+        size = 1
+    ) +
+    scale_fill_manual(values = col_pal[c("Tfam", "Polg", "Opa1")]) +
+    scale_color_manual(values = col_pal[c("Tfam", "Polg", "Opa1")]) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "None") +
+    xlab("Simulated Heteroplasmy Variance") +
+    ylab("Density") +
+    geom_text(
+        data = annotation_df,
+        aes(
+            x = obs_var + 0.0008,
+            y = y,
+            label = paste0(gRNA, " variance\np=", signif(pval, 3)),
+            color = gRNA
+        ),
+        vjust = -0.5,
+        hjust = 0,
+        size = 4,
+        show.legend = FALSE,
+        inherit.aes = FALSE
+    ) +
+    annotate(
+        "text",
+        x = obs_control_var + 0.0008,
+        y = dens_max,
+        label = "Control Variance",
+        color = col_pal["Oma1"],
+        vjust = -0.5,
+        hjust = 0,
+        size = 4
+    )
+
+ggsave(
+    filename = here::here("figures", "simulated_variance_distribution_low_mtDNA_gRNAs.pdf"),
+    plot = combined_sim_var_plot,
+    width = 8,
+    height = 6,
+    dpi = 300
+)
+combined_sim_var_plot
+
+```
+
+P-values in the above plot are one-tailed, testing the null hypothesis that the observed heteroplasmy variance in the `gRNA KO` group is not significantly greater than the distribution of simulated variances derived from the `Control` group.
+
+```{r}
+#| label: heteroplasmy-variance-summary
+
+het_var_summary <- bind_rows(
+    lapply(names(het_sim_results), function(gRNA) {
+        res <- het_sim_results[[gRNA]]
+        data.frame(
+            gRNA = gRNA,
+            Observed = res$obs_ko_var,
+            Technical = res$sim_ko_var,
+            Biological = res$obs_ko_var - res$sim_ko_var
+        )
+    })
+)
+
+# Get significant gRNAs
+gRNA_significant <- names(het_sim_results)[purrr::map_lgl(het_sim_results, ~ .x$p_value < 0.05)]
+
+# Filter summary table
+het_var_summary_sig <- het_var_summary %>%
+    filter(gRNA %in% gRNA_significant) %>%
+    dplyr::mutate(across(-gRNA, ~ as.numeric(.x))) %>%
+    dplyr::mutate(across(-gRNA, ~ round(.x, 4)))
+
+het_var_summary_sig %>%
+    kbl(
+        format = "html",
+        caption = "Heteroplasmy Variance for Significant gRNAs (p &lt; 0.05)",
+        align = "c"
+    ) %>%
+    kable_styling(full_width = FALSE) %>%
+    add_header_above(
+        c(" " = 1, "Heteroplasmy Variance" = 3)
+    )
+```
+
+```{r}
+#| label: session_info
+#| echo: false
+#| output: asis
+
+cat("::: {.callout-note collapse='true'}\n")
+cat("## Session Information\n\n")
+cat("```\n")
+print(sessionInfo())
+cat("\n```\n")
+cat(":::\n")
+```
