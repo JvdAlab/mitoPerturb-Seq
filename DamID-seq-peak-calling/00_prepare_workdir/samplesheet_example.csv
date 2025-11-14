@@ -1,0 +1,5 @@
+sample,sample_type,fastq1,fastq2
+ATF4_rep1,Dam-fusion,/path/to/ATF4_rep1_R1.fastq.gz,/path/to/ATF4_rep1_R2.fastq.gz
+ATF4_rep2,Dam-fusion,/path/to/ATF4_rep2_R1.fastq.gz,/path/to/ATF4_rep2_R2.fastq.gz
+DAM_rep1,Dam-only,/path/to/DAM_rep1_R1.fastq.gz,/path/to/DAM_rep1_R2.fastq.gz
+DAM_rep2,Dam-only,/path/to/DAM_rep2_R1.fastq.gz,/path/to/DAM_rep2_R2.fastq.gz
