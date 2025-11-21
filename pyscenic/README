@@ -1,0 +1,1 @@
+Scripts to generate pySCENIC analyses, starting from a Seurat object, coverting this to a loom object, running pySCENIC, adding metadata, and performing analyses in R.
