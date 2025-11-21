@@ -1,0 +1,2 @@
+Scripts to generate gRNA information and how to append this to a Seurat object. 
+Additional scripts to generate the information for multiple guides and mixscape classifications
