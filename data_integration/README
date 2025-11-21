@@ -1,0 +1,5 @@
+Scripts used for data integration:
+data_integration.R
+data_integration_add_guide_info.R
+
+NB: the second script can only be used after performing steps 1 to 3 of guide_detection
