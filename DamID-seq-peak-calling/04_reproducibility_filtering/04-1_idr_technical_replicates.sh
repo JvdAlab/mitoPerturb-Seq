@@ -6,7 +6,7 @@
 source "../config/config.sh"
 
 # Script-specific parameters
-IDR_THRESHOLD_ROUND1=0.01
+IDR_THRESHOLD_ROUND1=0.05
 IDR_RANK="signal.value"
 
 mkdir -p "${IDR_DIR}"
