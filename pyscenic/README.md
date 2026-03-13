@@ -20,7 +20,7 @@ Infers gene regulatory networks (GRNs) and transcription factor (TF) activities 
 | Script | Description | Parameters |
 |:-------|:------------|:-----------|
 | [`01_prep_pyscenic.R`](./01_prep_pyscenic.R) | Converts Seurat object to loom format, filters genes present in pySCENIC databases | RNA assay, gene filtering |
-| [`02_pyscenic_arboreto_ctx_aucell.sh`](./02_pyscenic_arboreto_ctx_aucell.sh) | Runs pySCENIC pipeline: GRNBoost2, cisTarget motif enrichment, AUCell scoring | Method: grnboost2, seed: 777, 32 workers |
+| [`02_pyscenic_arboreto_ctx_aucell.sh`](./02_pyscenic_arboreto_ctx_aucell.sh) | Runs pySCENIC pipeline: GRNBoost2, cisTarget motif enrichment, AUCell scoring | Method: grnboost2, seed: 777; ctx/aucell: 32 workers |
 | [`03_post_pyscenic_add_metadata.py`](./03_post_pyscenic_add_metadata.py) | Adds Seurat metadata to pySCENIC output loom file | Python h5py |
 | [`04_pyscenic_analysis.R`](./04_pyscenic_analysis.R) | Loads loom results, extracts regulons and AUCell scores for downstream analysis | AUCell thresholding |
 

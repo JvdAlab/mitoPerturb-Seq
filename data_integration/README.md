@@ -5,7 +5,7 @@
 Integrates multimodal single-cell data (RNA, ATAC, mitochondrial variants) across samples and merges with gRNA assignments to generate a unified Seurat object.
 
 **Input:**
-- Cell Ranger multi output (RNA + ATAC)
+- Cell Ranger ARC output (RNA + ATAC)
 - mgatk mitochondrial variant calls
 - gRNA assignment metadata (from gRNA_assignment workflow)
 
@@ -80,7 +80,7 @@ Integrates multimodal single-cell data (RNA, ATAC, mitochondrial variants) acros
 ## Prerequisites
 
 **Before running data_integration.R:**
-- Cell Ranger multi output directories for all samples
+- Cell Ranger ARC output directories for all samples
 - mgatk analysis completed
 
 **Before running data_integration_add_guide_info.R:**

@@ -41,14 +41,6 @@ Identifies differentially expressed genes between perturbations and non-targetin
 - Similarity metric: Wang semantic similarity
 - Visualization: Treeplots with consistent scaling across comparisons
 
-**Databases Queried (enrichR):**
-- GO_Biological_Process_2023
-- GO_Cellular_Component_2018
-- GO_Molecular_Function_2018
-- KEGG_2019_Mouse
-- Mouse_Gene_Atlas
-- WikiPathways_2019_Mouse
-
 ---
 
 ## Dependencies

@@ -43,9 +43,9 @@ Assigns CRISPR guide RNAs to single cells from 10X Chromium FASTQ files and clas
 - Output: BAM file with guide alignments per cell barcode
 
 **Guide Assignment:**
-- Counts UMIs per guide per cell
-- Assignment threshold: Typically ≥2 UMIs
-- Handles single or multiple guide assignments
+- Filters: MAPQ ≥ 30 (alignment quality)
+- Counts reads per guide per cell; minimum threshold: ≥2 reads
+- Single guide assigned if top guide exceeds 2/3 of all guide reads (ratio > 0.67); otherwise labelled `multiple_guides`
 
 **Mixscape Classification:**
 - **KO (Knock-out):** Cells showing perturbation signature

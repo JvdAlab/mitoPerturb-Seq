@@ -33,7 +33,7 @@ Simulates heteroplasmy sampling and quantifies SNV correlation accuracy at varyi
 
 **SNV Correlation Analysis:**
 - **Reference SNV:** m.5024C>T
-- **Compared SNVs:** m.13715C>T, m.13614C>T, m.1781C>T, m.1866A>G, m.3009G>T, m.3823C>T
+- **Compared SNVs:** m.13715C>T, m.13614C>T, m.1781C>T, m.1866A>G, m.3009G>T, m.3823T>C
 - **Depth range:** 0× to 150× (5× increments)
 - **Outputs:** Pearson correlation coefficients and % cells retained at each threshold
 

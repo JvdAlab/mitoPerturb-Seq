@@ -125,12 +125,12 @@ DAM_rep1,Dam-only,/path/to/DAM_rep1_R1.fastq.gz,/path/to/DAM_rep1_R2.fastq.gz
 | **03: Peak Calling** |
 | [`03-1_call_pairwise_peaks.sh`](./03_peak_calling/03-1_call_pairwise_peaks.sh) | Calls broad peaks using MACS3 (Dam-fusion vs Dam-only) | [MACS3](https://github.com/macs3-project/MACS) v3.0.3, `--broad`, q<0.05, 300bp ext, mfold 5-50 |
 | **04: Reproducibility Filtering** |
-| [`04-1_idr_technical_replicates.sh`](./04_reproducibility_filtering/04-1_idr_technical_replicates.sh) | Round 1 IDR: Merges technical replicates | [IDR](https://github.com/nboley/idr) v2.0.3, threshold 0.05, rank: signal.value |
-| [`04-2_idr_biological_replicates.sh`](./04_reproducibility_filtering/04-2_idr_biological_replicates.sh) | Round 2 IDR: Tests all pairwise biological replicate combinations | [IDR](https://github.com/nboley/idr) v2.0.3, threshold 0.01 |
-| [`04-3_intersect_peak_sets.sh`](./04_reproducibility_filtering/04-3_intersect_peak_sets.sh) | Multi-intersection: Retains peaks in ≥2 comparisons and merges overlaps | [bedtools](https://github.com/arq5x/bedtools2) v2.31.0, min support: 2 |
+| [`04-1_idr_technical_replicates.sh`](./04_reproducibility_filtering/04-1_idr_technical_replicates.sh) | Round 1 IDR: Scores reproducibility across technical replicates (threshold used for output naming) | [IDR](https://github.com/nboley/idr) v2.0.3, rank: signal.value |
+| [`04-2_idr_biological_replicates.sh`](./04_reproducibility_filtering/04-2_idr_biological_replicates.sh) | Round 2 IDR: All pairwise biological replicate combinations (threshold used for output naming) | [IDR](https://github.com/nboley/idr) v2.0.3 |
+| [`04-3_intersect_peak_sets.sh`](./04_reproducibility_filtering/04-3_intersect_peak_sets.sh) | Multi-intersection: Retains peaks present in ≥2 pairwise comparisons and merges overlaps | [bedtools](https://github.com/arq5x/bedtools2) v2.31.0, min support: 2 |
 | **05: Annotation & Motifs** |
 | [`05-1_annotate_peaks_to_genes.sh`](./05_annotation/05-1_annotate_peaks_to_genes.sh) | Assigns peaks to nearest genes, annotates genomic features | [HOMER](http://homer.ucsd.edu/homer/) v5.1, `annotatePeaks.pl`, mm10 |
-| [`05-2_identify_motif_enrichment.sh`](./05_annotation/05-2_identify_motif_enrichment.sh) | Identifies enriched sequence motifs (±200 bp) | [HOMER](http://homer.ucsd.edu/homer/) v5.1, `findMotifsGenome.pl`, 200bp window |
+| [`05-2_identify_motif_enrichment.sh`](./05_annotation/05-2_identify_motif_enrichment.sh) | Identifies enriched sequence motifs | [HOMER](http://homer.ucsd.edu/homer/) v5.1, `findMotifsGenome.pl`, `-size 200` (±100 bp around peak summit) |
 | **06: Visualization (Optional)** |
 | [`06-1_convert_bedgraph_to_bigwig.sh`](./06_visualization/06-1_convert_bedgraph_to_bigwig.sh) | Un-logs bedGraph and converts to bigWig format | [bedGraphToBigWig](https://www.encodeproject.org/software/bedgraphtobigwig/), transform: 2^x |
 | [`06-2_create_genome_browser_tracks.sh`](./06_visualization/06-2_create_genome_browser_tracks.sh) | Generates genome browser track configurations | [pyGenomeTracks](https://github.com/deeptools/pyGenomeTracks) v3.9 |
@@ -176,14 +176,14 @@ Bash scripts assume execution on an HPC cluster with SLURM workload manager.
 - Keep duplicates: all
 
 **Reproducibility Filtering (IDR):**
-- Round 1 (technical replicates): IDR < 0.05
-- Round 2 (biological replicates): IDR < 0.01
+- Round 1 (technical replicates): IDR scored with threshold 0.05 (used for output file naming)
+- Round 2 (biological replicates): IDR scored with threshold 0.01 (used for output file naming)
 - Ranking method: signal.value
-- Final support threshold: ≥2 pairwise comparisons
+- Final filter: peaks present in ≥2 pairwise biological replicate comparisons (bedtools multiinter)
 
 **Annotation (HOMER):**
 - Reference: mm10
-- Motif search window: ±200 bp around peak summit
+- Motif search window: 200 bp total (`-size 200`, ±100 bp around peak summit)
 
 ---
 
