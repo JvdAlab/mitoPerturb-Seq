@@ -1,5 +1,7 @@
 # mitoPerturb-Seq
 
+[![DOI](https://zenodo.org/badge/1088389701.svg)](https://doi.org/10.5281/zenodo.19008664)
+
 Analysis code for:
 
 > **"MitoPerturb-Seq identifies gene-specific single-cell responses to mitochondrial DNA depletion and heteroplasmy**
