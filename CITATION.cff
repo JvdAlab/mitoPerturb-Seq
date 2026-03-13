@@ -1,0 +1,79 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "MitoPerturb-Seq: Analysis code for 'MitoPerturb-Seq identifies gene-specific single-cell responses to mitochondrial DNA depletion and heteroplasmy'"
+abstract: >
+  Computational pipelines for the MitoPerturb-Seq study: single-cell multiome
+  (scRNA-seq + scATAC-seq) with CRISPR perturbation screening across 13
+  mitochondrial target genes, mitochondrial heteroplasmy calling and variance
+  modelling, and ATF4 chromatin binding analysis using DamID-seq.
+license: MIT
+repository-code: "https://github.com/jvdnameele/mitoPerturb-Seq"
+authors:
+  - family-names: Burr
+    given-names: Stephen P.
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Auckland
+    given-names: Kathryn
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Glynos
+    given-names: Angelos
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Dhawanjewar
+    given-names: Abhilesh
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Ryall
+    given-names: Cameron
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Wei
+    given-names: Wei
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Hynes-Allen
+    given-names: Antony
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: Prater
+    given-names: Malwina
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK; Altos Labs Cambridge Institute, Cambridge, UK"
+  - family-names: Sczaniecka-Clift
+    given-names: Matylda
+    affiliation: "MRC Laboratory of Molecular Biology, University of Cambridge, UK"
+  - family-names: Prudent
+    given-names: Julien
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK"
+  - family-names: Chinnery
+    given-names: Patrick F.
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+  - family-names: van den Ameele
+    given-names: Jelle
+    affiliation: "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"
+preferred-citation:
+  type: article
+  title: "MitoPerturb-Seq identifies gene-specific single-cell responses to mitochondrial DNA depletion and heteroplasmy"
+  authors:
+    - family-names: Burr
+      given-names: Stephen P.
+    - family-names: Auckland
+      given-names: Kathryn
+    - family-names: Glynos
+      given-names: Angelos
+    - family-names: Dhawanjewar
+      given-names: Abhilesh
+    - family-names: Ryall
+      given-names: Cameron
+    - family-names: Wei
+      given-names: Wei
+    - family-names: Hynes-Allen
+      given-names: Antony
+    - family-names: Prater
+      given-names: Malwina
+    - family-names: Sczaniecka-Clift
+      given-names: Matylda
+    - family-names: Prudent
+      given-names: Julien
+    - family-names: Chinnery
+      given-names: Patrick F.
+    - family-names: van den Ameele
+      given-names: Jelle
+  doi: "10.1101/2025.07.08.663208"
+  url: "https://www.biorxiv.org/content/10.1101/2025.07.08.663208v1.full"
+  year: 2025

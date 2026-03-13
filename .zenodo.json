@@ -1,0 +1,41 @@
+{
+  "title": "MitoPerturb-Seq: Analysis code for 'MitoPerturb-Seq identifies gene-specific single-cell responses to mitochondrial DNA depletion and heteroplasmy'",
+  "description": "Computational pipelines for the MitoPerturb-Seq study: single-cell multiome (scRNA-seq + scATAC-seq) with CRISPR perturbation screening across 13 mitochondrial target genes, mitochondrial heteroplasmy calling and variance modelling, and ATF4 chromatin binding analysis using DamID-seq. ~6,500 mouse embryonic fibroblasts (MEFs) from the m.5024C>T heteroplasmic mouse line.",
+  "upload_type": "software",
+  "license": "MIT",
+  "creators": [
+    {"name": "Burr, Stephen P.",           "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Auckland, Kathryn",          "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Glynos, Angelos",            "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Dhawanjewar, Abhilesh",      "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Ryall, Cameron",            "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Wei, Wei",                  "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Hynes-Allen, Antony",       "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "Prater, Malwina",           "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK; Altos Labs Cambridge Institute, Cambridge, UK"},
+    {"name": "Sczaniecka-Clift, Matylda", "affiliation": "MRC Laboratory of Molecular Biology, University of Cambridge, UK"},
+    {"name": "Prudent, Julien",           "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK"},
+    {"name": "Chinnery, Patrick F.",      "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"},
+    {"name": "van den Ameele, Jelle",     "affiliation": "MRC Mitochondrial Biology Unit, University of Cambridge, UK; Department of Clinical Neurosciences, University of Cambridge, UK"}
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.1101/2025.07.08.663208",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-preprint",
+      "scheme": "doi"
+    }
+  ],
+  "keywords": [
+    "mitochondria",
+    "heteroplasmy",
+    "CRISPR",
+    "Perturb-seq",
+    "single-cell RNA-seq",
+    "scATAC-seq",
+    "DamID-seq",
+    "mgatk",
+    "mixscape",
+    "mouse embryonic fibroblasts"
+  ],
+  "access_right": "open"
+}
