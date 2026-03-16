@@ -20,28 +20,28 @@ cd /../../
 
 /../../.conda/envs/pyscenic/bin/arboreto_with_multiprocessing.py \
 project_rna_assay_filtered.loom \
-allTFs_hg38.txt \
+allTFs_mm.txt \
 --method grnboost2 \
 --output project_rna_assay_filtered_adjacencies.csv \
 --seed 777
 
 
-db_names=("pyscenic_databases/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather" "pyscenic_databases/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather" "pyscenic_databases/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather" "pyscenic_databases/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather")
+db_names=("pyscenic_databases/mm_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather" "pyscenic_databases/mm_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather" "pyscenic_databases/mm_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather" "pyscenic_databases/mm_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather")
 
 echo ${db_names[@]}
 
 pyscenic ctx \
 project_rna_assay_filtered_adjacencies.csv \
 ${db_names[@]} \
---annotations_fname pyscenic_databases/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl \
+--annotations_fname pyscenic_databases/motifs-v10nr_clust-nr.mgi-m0.001-o0.0.tbl \
 --expression_mtx_fname project_rna_assay_filtered.loom \
 --output project_rna_assay_filtered_ctxreg.csv \
 --mask_dropouts \
---num_workers 32 
+--num_workers 32
 
 
 pyscenic aucell \
 project_rna_assay_filtered.loom \
 project_rna_assay_filtered_ctxreg.csv \
 --output project_rna_assay_pyscenic_output_filtered.loom \
---num_workers 32 
+--num_workers 32

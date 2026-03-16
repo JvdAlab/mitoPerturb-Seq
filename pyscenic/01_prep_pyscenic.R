@@ -1,8 +1,8 @@
-##### Prep pySCENIC object 
-##### Load seurat object 
-##### Extract RNA assay 
-##### Filter for only those genes in pyscenic databases 
-##### Convert to loom object and save 
+##### Prep pySCENIC object
+##### Load seurat object
+##### Extract RNA assay
+##### Filter for only those genes in pyscenic databases
+##### Convert to loom object and save
 
 # load packages
 library(arrow)
@@ -32,7 +32,7 @@ library(tidyverse)
 # enter project name
 project <- "project"
 
-# set directory 
+# set directory
 baseDir <- "/../../"
 setwd(baseDir)
 
@@ -69,7 +69,7 @@ Layers(MultiOme[["RNA"]])
 # join layers
 MultiOme[["RNA"]] <- JoinLayers(MultiOme[["RNA"]])
 
-# check layers 
+# check layers
 Layers(MultiOme[["RNA"]])
 
 
@@ -89,19 +89,19 @@ dim(expr_matrix)
 # read in the four feather files
 feather_dir <- "/../../pyscenic_databases/"
 feather_files <- c(
-  "hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
-  "hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
-  "hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
-  "hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather"
+  "mm10_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
+  "mm10_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
+  "mm10_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
+  "mm10_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather"
 )
 
 all_genes <- unique(unlist(lapply(file.path(feather_dir, feather_files), function(f) {
   message("Reading genes from: ", f)
   cols <- colnames(read_feather(f))
-  cols[cols != "motif"]  # remove the motif column
+  cols[cols != "motif"] # remove the motif column
 })))
 
-length(all_genes)  
+length(all_genes)
 
 genes_to_keep <- intersect(rownames(expr_matrix), all_genes)
 expr_matrix_filtered <- expr_matrix[genes_to_keep, , drop = FALSE]
@@ -110,13 +110,13 @@ dim(expr_matrix_filtered)
 # extract metadata
 cell_metadata <- MultiOme@meta.data
 cell_ids <- rownames(cell_metadata)
-metadata_to_keep <- c("orig.ident", "guide", "gene") 
+metadata_to_keep <- c("orig.ident", "guide", "gene")
 
 # convert metadata columns to character and replace NAs
 metadata_list <- lapply(metadata_to_keep, function(col) {
   x <- cell_metadata[[col]]
-  x <- as.character(x)                  
-  x[is.na(x)] <- ""                     
+  x <- as.character(x)
+  x[is.na(x)] <- ""
   return(x)
 })
 
@@ -141,10 +141,9 @@ if (file.exists(loom_file)) {
 # create loom file (genes × cells)
 lp <- loomR::create(
   filename = loom_file,
-  data = expr_matrix_filtered,  
+  data = expr_matrix_filtered,
   row.attrs = row_attrs,
   col.attrs = col_attrs
 )
 
 lp$close_all()
-

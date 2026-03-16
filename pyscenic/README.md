@@ -6,7 +6,7 @@ Infers gene regulatory networks (GRNs) and transcription factor (TF) activities 
 
 **Input:**
 - Integrated Seurat object with RNA assay
-- Human TF list and motif databases (hg38)
+- Mouse TF list and motif databases (mm10)
 
 **Output:**
 - Gene-TF adjacency matrices
@@ -30,14 +30,14 @@ Infers gene regulatory networks (GRNs) and transcription factor (TF) activities 
 
 **Step 1: GRN Inference (GRNBoost2)**
 - Algorithm: Gradient boosting regression trees
-- Input: Expression matrix + TF list (hg38)
+- Input: Expression matrix + TF list (mm10)
 - Output: Gene-TF adjacency matrix with importance scores
 
 **Step 2: Regulon Pruning (cisTarget)**
 - Databases:
-  - `hg38_10kbp_up_10kbp_down_full_tx_v10_clust`
-  - `hg38_500bp_up_100bp_down_full_tx_v10_clust`
-- Motif annotations: `motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl`
+  - `mm10_10kbp_up_10kbp_down_full_tx_v10_clust`
+  - `mm10_500bp_up_100bp_down_full_tx_v10_clust`
+- Motif annotations: `motifs-v10nr_clust-nr.mgi-m0.001-o0.0.tbl`
 - Filters: TF-target links with motif support in promoter regions
 
 **Step 3: Activity Scoring (AUCell)**
@@ -64,9 +64,9 @@ Infers gene regulatory networks (GRNs) and transcription factor (TF) activities 
 | [SCopeLoomR](https://github.com/aertslab/SCopeLoomR) | ≥0.13 | SCENIC loom utilities |
 
 **Reference Databases:**
-- Human TF list: `allTFs_hg38.txt`
-- Motif rankings: `hg38_*_clust.genes_vs_motifs.rankings.feather`
-- Motif scores: `hg38_*_clust.genes_vs_motifs.scores.feather`
+- Mouse TF list: `allTFs_mm.txt`
+- Motif rankings: `mm10_*_clust.genes_vs_motifs.rankings.feather`
+- Motif scores: `mm10_*_clust.genes_vs_motifs.scores.feather`
 
 ---
 
@@ -108,4 +108,3 @@ Rscript 04_pyscenic_analysis.R
 - Bash script assumes SLURM workload manager
 - Runtime: ~24-96 hours depending on dataset size and available cores
 - Requires 64+ GB RAM for large datasets
-- Uses hg38 databases (human); modify for mouse (mm10) if needed
