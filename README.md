@@ -2,10 +2,15 @@
 
 [![DOI](https://zenodo.org/badge/1088389701.svg)](https://doi.org/10.5281/zenodo.19008664)
 
-Analysis code for:
+Analysis code accompanying:
 
-> **"MitoPerturb-Seq identifies gene-specific single-cell responses to mitochondrial DNA depletion and heteroplasmy**
-> [bioRxiv preprint](https://www.biorxiv.org/content/10.1101/2025.07.08.663208v1.full)
+> Burr, S. P., Auckland, K., Glynos, A., Dhawanjewar, A., Ryall, C.,
+> Wei, W., Hynes-Allen, A., Prater, M., Sczaniecka-Clift, M.,
+> Prudent, J., Chinnery, P. F. & van den Ameele, J.
+> **MitoPerturb-Seq identifies gene-specific single-cell responses to
+> mitochondrial DNA depletion and heteroplasmy.**
+> *Nature Structural & Molecular Biology* **33**, 711–723 (2026).
+> <https://doi.org/10.1038/s41594-026-01779-7>
 
 ---
 
@@ -54,14 +59,19 @@ Raw sequencing data are deposited in GEO:
 
 ## Citation
 
-If you use this code, please cite:
+If you use this code, please cite the published study:
 
-```
-Burr et. al. "MitoPerturb-Seq identifies gene-specific single-cell responses to
-mitochondrial DNA depletion and heteroplasmy."
+> Burr, S. P., Auckland, K., Glynos, A., Dhawanjewar, A., Ryall, C.,
+> Wei, W., Hynes-Allen, A., Prater, M., Sczaniecka-Clift, M.,
+> Prudent, J., Chinnery, P. F. & van den Ameele, J.
+> **MitoPerturb-Seq identifies gene-specific single-cell responses to
+> mitochondrial DNA depletion and heteroplasmy.**
+> *Nature Structural & Molecular Biology* **33**, 711–723 (2026).
+> <https://doi.org/10.1038/s41594-026-01779-7>
 
-Preprint: bioRxiv (2025). https://doi.org/10.1101/2025.07.08.663208
-```
+The archived repository is available via Zenodo:
+
+> <https://doi.org/10.5281/zenodo.19008664>
 
 ---
 

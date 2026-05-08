@@ -8,7 +8,7 @@ abstract: >
   mitochondrial target genes, mitochondrial heteroplasmy calling and variance
   modelling, and ATF4 chromatin binding analysis using DamID-seq.
 license: MIT
-repository-code: "https://github.com/jvdnameele/mitoPerturb-Seq"
+repository-code: "https://github.com/JvdAlab/mitoPerturb-Seq"
 authors:
   - family-names: Burr
     given-names: Stephen P.
@@ -74,6 +74,11 @@ preferred-citation:
       given-names: Patrick F.
     - family-names: van den Ameele
       given-names: Jelle
-  doi: "10.1101/2025.07.08.663208"
-  url: "https://www.biorxiv.org/content/10.1101/2025.07.08.663208v1.full"
-  year: 2025
+  doi: "10.1038/s41594-026-01779-7"
+  url: "https://www.nature.com/articles/s41594-026-01779-7"
+  year: 2026
+  journal: "Nature Structural & Molecular Biology"
+  volume: 33
+  start: 711
+  end: 723
+  date-published: "2026-04-01"
